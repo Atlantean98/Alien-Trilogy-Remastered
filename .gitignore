@@ -1,0 +1,102 @@
+# Allow-list: only the PC version's own code is published (source, build/test tools, level editor, launchers).
+# Everything else in this folder stays local: the game's own files (GameData, the PS1 disc, mods), builds,
+# vendored toolchains, decompiler projects and logs (they hold local paths), saves, settings, replays,
+# screenshots, playtest data, the Xbox 360 port, and editor/assistant settings.
+
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/CONTRIBUTING.md
+!/.github/
+!/Co-op Readme.txt
+!/Play DirectX 11.cmd
+!/Play DirectX 12.cmd
+!/Play Exploration Build.cmd
+!/Play Software.cmd
+!/Play Vulkan.cmd
+!/decompilation/
+!/tools/
+!/LevelEditor/
+
+# the disc importer's helpers (DemoWork) and the level generators shared with the console port (Xbox360/tools):
+# these scripts and the disc checklist (file sizes and hashes only) - the rest of both folders stays local
+!/DemoWork/
+/DemoWork/*
+!/DemoWork/importer.py
+!/DemoWork/disc_input.py
+!/DemoWork/mdec.py
+!/DemoWork/chd_reader.py
+!/DemoWork/supported_files.json
+!/Xbox360/
+/Xbox360/*
+!/Xbox360/tools/
+/Xbox360/tools/*
+!/Xbox360/tools/trilogy_level.py
+!/Xbox360/tools/make_survival_map.py
+!/Xbox360/tools/make_survival_lairs.py
+
+# decompilation: the C++ source and the libraries it builds with (the reports folder ships empty: the
+# self-tests write their results there)
+/decompilation/*
+!/decompilation/cpp/
+!/decompilation/third_party/
+!/decompilation/reports/
+/decompilation/cpp/build/
+/decompilation/cpp/build-release/
+/decompilation/cpp/package/
+/decompilation/reports/*
+!/decompilation/reports/.gitkeep
+
+# tools: the project's own scripts, not the vendored JDK / Ghidra / Python packages
+/tools/vendor/
+/LevelEditor/cache/
+# the launcher's icon is the original game's: used when packaging, never published
+/tools/package/icon.ico
+
+# never: build output, caches, logs, saves and per-user files anywhere below
+**/__pycache__/
+**/build/
+*.log
+*.exe
+*.dll
+*.obj
+*.o
+*.a
+*.lib
+*.pdb
+*.sav
+*.bmp
+*.wav
+*.elf
+*.xex
+settings.cfg
+achievements.txt
+survival_history.txt
+
+# never: IDE caches, CMake state, debug symbols, crash dumps, archives and disc images (game data stays local)
+.vs/
+.vscode/
+.idea/
+CMakeCache.txt
+CMakeFiles/
+*.pdb
+*.ilk
+*.dmp
+*.mdmp
+*.zip
+*.7z
+*.iso
+*.bin
+*.cue
+*.chd
+*.img
+*.ccd
+*.sub
+*.mdf
+*.mds
+*.ecm
+*.pbp
+
+# the libraries ship prebuilt SDL3 binaries the PC build links against
+!/decompilation/third_party/**

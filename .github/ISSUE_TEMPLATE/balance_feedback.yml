@@ -1,0 +1,72 @@
+name: Balance feedback
+description: How Survival, Queen's Revenge! or Extermination felt - too easy, too hard, too much or too little of something.
+title: "[Balance] "
+labels: ["balance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Survival and Extermination aren't completely balanced yet. Playtesting feedback is how the balance between the
+        player and the enemies gets right - thank you!
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: v0.9.0-beta
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Survival
+        - Queen's Revenge!
+        - Extermination
+        - Story campaign
+        - Online co-op
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Arena / level, difficulty and skull modifiers
+      description: For example "Survival arena 2, Hard, no skulls" or "Extermination level 3 (Queen's Lair), Normal".
+  - type: dropdown
+    id: overall
+    attributes:
+      label: Overall it felt...
+      options:
+        - Far too easy
+        - A bit too easy
+        - About right
+        - A bit too hard
+        - Far too hard
+    validations:
+      required: true
+  - type: checkboxes
+    id: areas
+    attributes:
+      label: What felt off?
+      options:
+        - label: Enemy numbers or wave size
+        - label: Enemy damage
+        - label: Enemy health (took too long or too short to kill)
+        - label: Enemy speed or behaviour
+        - label: Ammo or weapon supply
+        - label: Health or armour supply
+        - label: The Extermination squad (too strong, too weak, revives)
+        - label: The Queen
+        - label: Something else
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What happened, how far you got, and what you'd change. The more specific, the better.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Session log (optional)
+      description: Attach `session.log` from that session's folder (OPEN LOGS in the launcher) if you have it.

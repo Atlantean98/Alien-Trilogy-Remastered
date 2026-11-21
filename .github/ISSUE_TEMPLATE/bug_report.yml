@@ -1,0 +1,91 @@
+name: Bug or crash report
+description: Something went wrong in the game, the launcher or the disc import.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. The game keeps a log of every session: click **OPEN LOGS** in the
+        launcher (or open `game\logs` in the release, `logs\` in a source build). Each session has its own folder,
+        named by date and time. Your Windows user folder and user name are blanked out of these logs.
+
+        Please don't attach any game files or disc images.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown on the launcher and in the corner of the game's main menu.
+      placeholder: v0.9.0-beta
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What happened?
+      options:
+        - The game crashed or closed by itself
+        - An error message appeared
+        - Something in the game behaves wrongly (gameplay, enemies, doors, lifts...)
+        - Graphics or sound problem
+        - The disc import failed
+        - The launcher doesn't work
+        - Something else
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Story campaign
+        - Survival
+        - Queen's Revenge!
+        - Extermination
+        - Online co-op
+        - Menus / launcher / import
+    validations:
+      required: true
+  - type: input
+    id: level
+    attributes:
+      label: Level and difficulty
+      description: For example "3.2.5 Pilot's Chamber, Normal". The level code is shown in the briefing.
+  - type: dropdown
+    id: renderer
+    attributes:
+      label: Renderer
+      options:
+        - DirectX 11
+        - DirectX 12
+        - Vulkan
+        - Software
+        - Not sure
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again (if you know)
+      placeholder: |
+        1. Start 3.2.5
+        2. Shoot the Dog opposite the cockpit door
+        3. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Drag and drop `session.log` from that session's folder here, and `crash.txt` if there is one. For a disc
+        import failure, attach `game\import.log`. `crash.dmp` is optional (it can contain folder paths).
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Windows version and graphics card (if not in the log)
