@@ -200,8 +200,9 @@ Forks and pull requests are welcome; see [`CONTRIBUTING.md`](CONTRIBUTING.md) fo
 
 ## License
 
-The project's code is under the MIT License (see `LICENSE`), copyright Atlantean / NobleElite. Third-party libraries
-keep their own licenses.
+The project's code is under the MIT License (see `LICENSE`), copyright Atlantean / NobleElite. The license covers the
+project's own code only: it grants no rights to *Alien Trilogy*'s game data, which is not included. Third-party
+libraries in `decompilation/third_party` keep their own licenses.
 
 ## Legal
 
