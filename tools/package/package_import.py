@@ -8,7 +8,9 @@ import builtins
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
+import time
 import traceback
 
 GAME = Path(__file__).resolve().parents[2]          # <package>/game
@@ -19,16 +21,42 @@ _print = builtins.print
 state = {"percent": 1}
 
 
+def scrub(text):
+    """Keep the player's Windows user folder and name out of the log and errors (players attach them to bug reports)."""
+    text = str(text)
+    profile = os.environ.get("USERPROFILE", "")
+    for form in {profile, profile.replace("\\", "/"), profile.replace("\\", "\\\\")}:
+        if len(form) >= 4:
+            text = re.sub(re.escape(form), "%USERPROFILE%", text, flags=re.I)
+    name = os.environ.get("USERNAME", "")
+    if len(name) >= 3:
+        text = re.sub(r"(?<![A-Za-z0-9])" + re.escape(name) + r"(?![A-Za-z0-9])", "<user>", text, flags=re.I)
+    return text
+
+
 def progress(percent, message):
+    """Tell the launcher how far the import is. Never fails the import: the launcher reads this file several times a
+    second (and antivirus may scan it), so Windows can refuse to replace it for a moment; then retry, write it in place,
+    or skip this update."""
     state["percent"] = max(state["percent"], percent)
+    text = f"{state['percent']}\n{scrub(message)}"
     temporary = PROGRESS.with_suffix(".tmp")
-    temporary.write_text(f"{state['percent']}\n{message}", encoding="utf-8")
-    os.replace(temporary, PROGRESS)
+    for _ in range(20):
+        try:
+            temporary.write_text(text, encoding="utf-8")
+            os.replace(temporary, PROGRESS)
+            return
+        except OSError:
+            time.sleep(0.05)
+    try:
+        PROGRESS.write_text(text, encoding="utf-8")   # the launcher shares write access, so this usually works
+    except OSError:
+        pass
 
 
 def watch(*args, **kwargs):
     """Turn the importer's own messages into launcher progress."""
-    _print(*args, **kwargs)
+    _print(*(scrub(a) for a in args), **kwargs)
     text = " ".join(str(a) for a in args)
     if m := re.match(r"Extracting CD audio track (\d+)", text):
         progress(min(55, 20 + int(m.group(1)) * 2), f"Extracting the music (CD track {m.group(1)})...")
@@ -58,17 +86,28 @@ def main():
         import_pc_ps1.install(disc, GAME)
         progress(86, "Building the Survival arenas and Extermination levels...")
         import build_game_data
+
+        def run(script):   # the level builders run as their own processes: pass their output through scrub()
+            print(f"> {script.relative_to(build_game_data.ROOT)}")
+            done = subprocess.run([sys.executable, str(script)], cwd=build_game_data.ROOT, capture_output=True,
+                                  text=True, errors="replace")
+            for line in (done.stdout + done.stderr).splitlines():
+                _print(scrub(line))
+            if done.returncode:
+                raise RuntimeError(f"{script.name} failed (exit code {done.returncode}); see import.log")
+
+        build_game_data.run = run
         build_game_data.main()
         (GAME / "GameData" / "package-ready.txt").write_text("ready\n")
         progress(100, "Done")
         return 0
     except BaseException as error:   # noqa: BLE001 - every failure is reported to the launcher
         builtins.print = _print
-        traceback.print_exc()
+        print(scrub(traceback.format_exc()))
         message = str(error) or type(error).__name__
         if isinstance(error, FileNotFoundError):
             message = "A file named by the disc image is missing: " + message
-        ERROR.write_text(message, encoding="utf-8")
+        ERROR.write_text(scrub(message), encoding="utf-8")
         return 1
 
 

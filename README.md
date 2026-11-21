@@ -4,7 +4,7 @@ A native Windows port of *Alien Trilogy* (Probe/Acclaim, 1996). The game's logic
 executable as C++, routine by routine, and runs on the PlayStation version's data from your own disc, with modern
 rendering and controls and a set of new modes.
 
-By **Atlantean / NobleElite**. Current version: **v0.9.0-beta**.
+By **Atlantean / NobleElite**. Current version: **v0.9.1-beta**.
 
 ## Download and play
 
