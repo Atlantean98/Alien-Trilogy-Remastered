@@ -136,17 +136,20 @@ include(FetchContent)
 FetchContent_Declare(
 	bx
 	GIT_REPOSITORY https://github.com/bkaradzic/bx.git
-	GIT_TAG da13683750ff8df8f44a5a15f637b6ae9460a04b
+	GIT_TAG da13683750ff8df8f44a5a15f637b6ae9460a04b
+	GIT_CONFIG core.longpaths=true   # bgfx's tree has paths past Windows' 260-character limit
 )
 FetchContent_Declare(
 	bimg
 	GIT_REPOSITORY https://github.com/bkaradzic/bimg.git
-	GIT_TAG 64a34f7441af8f06e40ccab08d76bbf5e59e55b1
+	GIT_TAG 64a34f7441af8f06e40ccab08d76bbf5e59e55b1
+	GIT_CONFIG core.longpaths=true   # bgfx's tree has paths past Windows' 260-character limit
 )
 FetchContent_Declare(
 	bgfx
 	GIT_REPOSITORY https://github.com/bkaradzic/bgfx.git
-	GIT_TAG b2513038f4b753ebeced40821c193978daa0492f
+	GIT_TAG b2513038f4b753ebeced40821c193978daa0492f
+	GIT_CONFIG core.longpaths=true   # bgfx's tree has paths past Windows' 260-character limit
 )
 
 foreach(dep IN ITEMS bx bimg bgfx)

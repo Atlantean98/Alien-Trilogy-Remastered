@@ -124,7 +124,9 @@ a CUE/BIN dump. The import step reads it and writes the game's data into `GameDa
 
 ## Getting started
 
-Run these from the repository root.
+Clone or extract the repository to a **short folder path**, such as `C:\src\Alien-Trilogy-Remastered`: the graphics
+library the build downloads has very long file paths, and deep folders (Desktop, Downloads, OneDrive) can pass
+Windows' path-length limit. Run these from the repository root.
 
 1. Import your disc:
 
@@ -172,7 +174,8 @@ decompilation/cpp/build/recovered_world_explorer.exe --survival-self-test
 decompilation/cpp/build/recovered_world_explorer.exe --isolation-self-test
 ```
 
-`tools/check_playable.ps1` runs the wider playable suite. `recovered_checks.exe` (built alongside) checks the
+`tools/check_playable.ps1` runs the wider playable suite. `recovered_checks.exe` (build it with
+`cmake --build decompilation/cpp/build --target recovered_checks`) checks the
 recovered routines themselves, and the `tools/check_*.py` scripts compare them against the original executable's
 instructions (they need the DOS version's `TRILOGY.EXE` in `GameData/`; see `tools/setup_decompiler.py`).
 

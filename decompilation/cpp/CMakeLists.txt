@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 project(TrilogyRecovered LANGUAGES CXX)
+# bgfx's sources have very long paths; deep folders can pass Windows' 260-character limit (fetched with core.longpaths,
+# but some tools still struggle). Say so plainly instead of failing later with a missing-file compiler error.
+string(LENGTH "${CMAKE_BINARY_DIR}" TRILOGY_BUILD_PATH_LENGTH)
+if(WIN32 AND TRILOGY_BUILD_PATH_LENGTH GREATER 100)
+    message(WARNING "The build folder's path is ${TRILOGY_BUILD_PATH_LENGTH} characters long. If the build fails with a missing file, "
+                    "move the repository to a short folder such as C:/src/Alien-Trilogy-Remastered and configure again.")
+endif()
 # Keep this machine's folders out of the binaries: source, build and toolchain paths that the compiler records
 # (debug info, lambda names, header asserts) are rewritten to short relative names.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
