@@ -20,7 +20,7 @@ troubleshooting. No game files are included in the release or in this repository
 
 To build it yourself instead, see [Getting started](#getting-started) below.
 
-## A note from Atlantean
+## A note from me
 
 > I used AI to mostly help me build this, specifically Claude Opus 5.5 for the gameplay you see here. The native PC
 > build was built using Codex GPT Sol 6.1 originally, but will have holes patched using Claude in the future. I also make
