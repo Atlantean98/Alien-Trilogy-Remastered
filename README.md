@@ -107,7 +107,7 @@ a CUE/BIN dump. The import step reads it and writes the game's data into `GameDa
 - Level skip for the beta: Page Down / Page Up jump to the next / previous level in the story campaign (not in
   Survival, Extermination or co-op).
 - **Survival**: endless waves in three arenas, plus *Queen's Revenge!* and Xeno Skull modifiers.
-- **Extermination**: unlocked by finishing the campaign's final level (3.9.1). Three levels with a
+- **Extermination**: unlocks once you complete the main game (its final level, 3.9.1). Three levels with a
   three-strong squad of Alien Handlers who fight, can be downed and revived; recover the crew ID tags and clear every alien
   before extraction. Levels 1 and 2 each join two campaign maps into one.
 - Online co-op for the full campaign and Survival (see `Co-op Readme.txt`), replays and achievements.

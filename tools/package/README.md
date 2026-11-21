@@ -62,8 +62,8 @@ movies. To add them:
   plus a photo mode.
 - **Controls**: keyboard, mouse and controllers (Xbox and PlayStation pads), with remapping and rumble.
 - **Survival**: endless waves in three arenas, with *Queen's Revenge!* and Xeno Skull modifiers.
-- **Extermination**: a three-act campaign with a squad of Alien Handlers. It appears on the main menu once you finish the main
-  game's final level (3.9.1).
+- **Extermination**: a three-act campaign with a squad of Alien Handlers. It unlocks on the main menu once you complete the main
+  game (its final level, 3.9.1).
 - **Co-op**: online co-op for the full campaign, start to finish, and for Survival (see `Co-op Readme.txt`), plus
   replays and achievements.
 
