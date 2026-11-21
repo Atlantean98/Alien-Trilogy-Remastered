@@ -20,7 +20,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from PIL import Image, ImageTk
 
-# The level format code is shared with the Xbox 360 build's Survival arena (Xbox360/tools).
+# The level format code is shared with the Xbox 360 build's Survival arena (Xbox360/tools; that build is a side project).
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Xbox360", "tools"))
 import trilogy_level as tl  # noqa: E402
 

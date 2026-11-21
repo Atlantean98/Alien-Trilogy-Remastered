@@ -1,7 +1,7 @@
 # Allow-list: only the PC version's own code is published (source, build/test tools, level editor, launchers).
 # Everything else in this folder stays local: the game's own files (GameData, the PS1 disc, mods), builds,
 # vendored toolchains, decompiler projects and logs (they hold local paths), saves, settings, replays,
-# screenshots, playtest data, the Xbox 360 port, and editor/assistant settings.
+# screenshots, playtest data, the Xbox 360 build (a side project), and editor/assistant settings.
 
 /*
 !/.gitignore
@@ -19,7 +19,7 @@
 !/tools/
 !/LevelEditor/
 
-# the disc importer's helpers (DemoWork) and the level generators shared with the console port (Xbox360/tools):
+# the disc importer's helpers (DemoWork) and the level generators shared with the Xbox 360 side project (Xbox360/tools):
 # these scripts and the disc checklist (file sizes and hashes only) - the rest of both folders stays local
 !/DemoWork/
 /DemoWork/*
@@ -35,6 +35,7 @@
 !/Xbox360/tools/trilogy_level.py
 !/Xbox360/tools/make_survival_map.py
 !/Xbox360/tools/make_survival_lairs.py
+!/Xbox360/tools/README.md
 
 # decompilation: the C++ source and the libraries it builds with (the reports folder ships empty: the
 # self-tests write their results there)

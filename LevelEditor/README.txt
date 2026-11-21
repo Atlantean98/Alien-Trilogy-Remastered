@@ -46,4 +46,5 @@ Level tab: name, look (whose textures, sounds and music), Survival or Exterminat
 lighting, starting weapons and map size. Checks tab: what still needs fixing before Export.
 
 The older top-down editor is still here as "Level Editor (2D).bat" (same project files). The level builder is
-shared with the Xbox 360 build's Survival arena (Xbox360\tools\trilogy_level.py).
+shared with the Xbox 360 build's Survival arena (Xbox360\tools\trilogy_level.py; the Xbox 360 build
+is a side project, not part of this repository).

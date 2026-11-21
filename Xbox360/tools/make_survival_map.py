@@ -1,4 +1,5 @@
-"""Builds the Xbox 360 Survival arena: a hive cavern in the style of the Section 1 queen level (L162), a little bigger,
+"""(Shared with the PC version, where it builds Survival arena 1; it began in a side project, an Xbox 360 build - see
+README.md here.) Builds the Xbox 360 Survival arena: a hive cavern in the style of the Section 1 queen level (L162), a little bigger,
 with door-sealed spawn rooms around its edge and the queen's chamber at the north end. The level itself is written by
 trilogy_level.py (the same writer the level editor uses), with L162's textures, sounds and music (code 162).
 

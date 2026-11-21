@@ -183,9 +183,14 @@ instructions (they need the DOS version's `TRILOGY.EXE` in `GameData/`; see `too
 | `decompilation/cpp/` | The game. The recovered original routines (`PlayerMovement.cpp`, `EnemyAI.cpp`, `LevelLoading.cpp` and so on) build into a library; `LevelExplorer.cpp` and the `Explorer*` files are the PC host around them (window, renderers, audio, HUD, menus, modes). |
 | `decompilation/third_party/` | bgfx (GPU renderers) and SDL3 (controllers). |
 | `tools/` | Build scripts, the disc importer, level builders (`build_extermination_decks.py`, `stitch_maps.py`), and checks. |
-| `Xbox360/tools/` | The level reader/writer and Survival arena generators, shared with a console port (only these scripts are published). |
+| `Xbox360/tools/` | The level reader/writer and Survival arena generators. They come from a side project, an Xbox 360 build (see below), and are shared with the PC version. |
 | `DemoWork/` | The disc-image reader and movie decoder the importer uses (only these scripts are published). |
 | `LevelEditor/` | A level editor (`Level Editor.bat`, or `Level Editor (2D).bat`). |
+
+**About the Xbox 360 references:** anything in this repository that mentions the Xbox 360 refers to a side project,
+an Xbox 360 homebrew build of the game that I worked on alongside the PC version. That build isn't part of this
+repository and isn't released; only the level scripts the PC version shares with it are here (see
+[`Xbox360/tools/README.md`](Xbox360/tools/README.md)).
 
 ## Contributing
 

@@ -1,4 +1,5 @@
-"""Reads and writes Alien Trilogy levels in the game's own format: for the Xbox 360 build's Survival arena
+"""Reads and writes Alien Trilogy levels in the game's own format (shared with the PC version; it began in a side
+project, an Xbox 360 build - see README.md here): for the Xbox 360 build's Survival arena
 (make_survival_map.py) and the standalone level editor (LevelEditor/editor_server.py, 3D).
 
 A level is described by a plain dict (the editor's project file is the same thing as JSON):

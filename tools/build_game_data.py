@@ -1,7 +1,7 @@
 """Build the levels the PC game generates from your imported disc (run tools/import_pc_ps1.py first):
 
   GameData/SURVIVAL, SURVIVAL2, SURVIVAL3   the three Survival arenas (Xbox360/tools/make_survival_*.py, shared
-                                            with the console port)
+                                            with a side project, an Xbox 360 build)
   GameData/Isolation/1-3                    the Extermination levels (tools/build_extermination_decks.py)
 
 Needs Python 3 with Pillow (pip install pillow).
