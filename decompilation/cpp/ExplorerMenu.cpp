@@ -210,7 +210,7 @@ std::vector<std::wstring> ExplorerMenu::rows()const{
   if(!hasGame&&isolationUnlocked())rows.push_back(L"Extermination");
   rows.push_back(L"Online Co-Op");
   if(!hasGame)rows.insert(rows.end(),{L"Stats",L"Replays"});
-  rows.insert(rows.end(),{L"Enter Password",L"Exit"});
+  rows.insert(rows.end(),{L"Options",L"Enter Password",L"Exit"});
   return rows;
  }
  if(page=="assessment"){if(!assessmentPassed)return {L"Retry Mission",L"Quit Game"};return {L"Continue game",L"Save game"};}
@@ -396,7 +396,7 @@ ExplorerMenu::Command ExplorerMenu::activate(unsigned key){
  else if(page=="extermination load"||page=="extermination save"){if(selection==3)back();else{if(page=="extermination load"&&!exterminationSlotLevel(selection)){message=L"This slot is empty.";return None;}return Command((page=="extermination load"?ExterminationLoad1:ExterminationSave1)+selection);}}
  else if(page=="assessment"){if(!assessmentPassed){if(selection)enter("confirm");else{open=false;return Restart;}return None;}if(selection==1)enter("save");else if(selection==2)enter("confirm");else{open=false;return NextMission;}}
  else if(page=="cheats"){if(selection==0)godMode=!godMode;else if(selection==1)infiniteAmmo=!infiniteAmmo;else if(selection==4){back();return None;}return CheatsChanged;}
- else if(page=="main"){auto label=list[selection];if(label==L"Continue"){if(hasGame){open=false;return Resume;}refreshContinue();if(continueSlot<0){selection=0;message=L"No valid progress save is available.";return None;}return Command(Load1+continueSlot);}if(label==L"Replays"){showReplays();return None;}if(label==L"Stats"){showStats();return None;}if(label==L"Extermination"){refreshExtermination();enter("colony isolation");return None;}if(label==L"Survival"){enter("survival");return None;}if(label==L"Online Co-Op"){enter("coop");return None;}if(label==L"Enter Password"){passwordText.clear();enter("password");return None;}if(label==L"Start"){if(hasGame){enter("new-confirm");return None;}enter("new-difficulty");return None;}if(label==L"Load")enter("load");else if(label==L"Exit")enter("confirm");}
+ else if(page=="main"){auto label=list[selection];if(label==L"Continue"){if(hasGame){open=false;return Resume;}refreshContinue();if(continueSlot<0){selection=0;message=L"No valid progress save is available.";return None;}return Command(Load1+continueSlot);}if(label==L"Replays"){showReplays();return None;}if(label==L"Stats"){showStats();return None;}if(label==L"Extermination"){refreshExtermination();enter("colony isolation");return None;}if(label==L"Survival"){enter("survival");return None;}if(label==L"Online Co-Op"){enter("coop");return None;}if(label==L"Options"){enter("options");return None;}if(label==L"Enter Password"){passwordText.clear();enter("password");return None;}if(label==L"Start"){if(hasGame){enter("new-confirm");return None;}enter("new-difficulty");return None;}if(label==L"Load")enter("load");else if(label==L"Exit")enter("confirm");}
  else if(page=="options"){if(cheatsUnlocked&&!coopSession&&selection==6){enter("cheats");return None;}constexpr const char* pages[]={"volume","controls","difficulty","", "graphics","credits"};if(selection==3){sway=!sway;persist();return Apply;}if(selection<6)enter(pages[selection]);else back();}
  else if(page=="survival results")return MainMenu;
  else if(page=="replays"){
