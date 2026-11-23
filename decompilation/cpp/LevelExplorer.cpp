@@ -1636,7 +1636,7 @@ fs::path Scene::capturePhoto(HWND window,int reqWidth,int reqHeight){
     return outPath;
 }
 void confineMouse(HWND window){RECT r;GetClientRect(window,&r);POINT a{r.left,r.top},b{r.right,r.bottom};ClientToScreen(window,&a);ClientToScreen(window,&b);RECT screen{a.x,a.y,b.x,b.y};ClipCursor(&screen);}
-void mouseCapture(HWND window,bool capture){if(capture==mouseCaptured)return;mouseCaptured=capture;held.fill(false);tapped.fill(false);if(capture){confineMouse(window);ShowCursor(FALSE);SetCursor(nullptr);}else{ClipCursor(nullptr);ShowCursor(TRUE);}scene.firing=false;scene.grenadeRequested=false;if(scene.audio)scene.audio->pause(!capture&&scene.menu.hasGame);SetWindowTextW(window,capture?TrilogyTitle:(std::wstring(TrilogyTitle)+L" â€” Paused (click to capture mouse)").c_str());}
+void mouseCapture(HWND window,bool capture){if(capture==mouseCaptured)return;mouseCaptured=capture;held.fill(false);tapped.fill(false);if(capture){confineMouse(window);ShowCursor(FALSE);SetCursor(nullptr);}else{ClipCursor(nullptr);ShowCursor(TRUE);}scene.firing=false;scene.grenadeRequested=false;if(scene.audio)scene.audio->pause(!capture&&scene.menu.hasGame);SetWindowTextW(window,capture?TrilogyTitle:(std::wstring(TrilogyTitle)+L" - Paused (click to capture mouse)").c_str());}
 RECT previousWindowedBounds{};bool haveWindowedBounds=false;std::string previousWindowedMonitor;unsigned previousWindowedResolution=0;
 std::wstring fullscreenDevice;
 unsigned fullscreenResolution=~0u;
