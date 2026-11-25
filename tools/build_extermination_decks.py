@@ -186,6 +186,41 @@ def reachable(m, doors, lifts, start=None):
     return dist
 
 
+def returnable(m, doors, lifts, target):
+    """Cells from which the player can walk back to `target`: reachable() searched backwards (same steps, headroom,
+    doors and lifts), so a drop counts only downhill toward the target. A pit or shaft you can fall into but not climb
+    out of is reachable but not returnable."""
+    def floors(c):
+        return set(lifts[c]) if c in lifts else {m.cell(*c)[11]}
+
+    def passable(c):
+        if not m.is_open(*c):
+            return False
+        cell = m.cell(*c)
+        if (cell[7] & 0x80 or cell[10] == 1 or 20 <= cell[10] <= 24) and c not in doors:
+            return False
+        return c in lifts or c in doors or cell[13] - cell[11] >= HEADROOM
+
+    def rise(c):
+        return 4 if 0x2d <= m.cell(*c)[10] <= 0x38 else 0
+
+    target = tuple(target)
+    todo = deque((target, f) for f in floors(target))
+    seen, cells = set(todo), {target}
+    while todo:
+        c, f = todo.popleft()   # standing on c at floor f: from which neighbouring floor could the player step here?
+        for n in ((c[0] + 1, c[1]), (c[0] - 1, c[1]), (c[0], c[1] + 1), (c[0], c[1] - 1)):
+            if not passable(n):
+                continue
+            for nf in floors(n):
+                if f - (nf + rise(n)) > STEP or (n, nf) in seen:
+                    continue
+                seen.add((n, nf))
+                cells.add(n)
+                todo.append((n, nf))
+    return cells
+
+
 def gated(m, dist, doors, lifts):
     """Cells whose shortest route from the start passes a door or a lift (a puzzle on the way)."""
     gate = {}
@@ -458,6 +493,31 @@ def remix(number, code, title, packs, tag_count, second=None):
             acts[i * 4 + 2] = 255
     # Lower ceilings: the largest high rooms away from doors, lifts and objects.
     lowered = lower_ceilings(m, dist, set(doors) | set(lifts) | corridor | (set(neighbours8(queen, 3)) if queen else set()))
+    # Every egg and every alien that counts toward clearing the deck (kinds 1-6) must stand where the player can get to
+    # AND get back from - not down a shaft or in a pit they could only drop into (an egg there hatches a Facehugger
+    # nobody can reach, and the deck can never be cleared). Any that aren't are moved to the nearest free such cell.
+    homes = returnable(m, doors, lifts, start)
+    if stitched:
+        homes |= returnable(m, doors, lifts, stitched["second_start"])
+    two_way = {c for c in dist if c in homes}
+    occupied = set(doors) | set(lifts) | set(objects) | corridor | {(r[1], r[2]) for r in records}
+    moved = 0
+    for i, r in enumerate(records):
+        cell = (r[1], r[2])
+        if not 1 <= r[0] <= 6 or r[8] or cell in two_way:   # held (a crate's Facehugger) comes out where its crate is
+            continue
+        options = [c for c in two_way if c not in occupied and m.cell(*c)[15] == 0 and roomy(c)]
+        if not options:
+            raise SystemExit(f"deck {number}: no reachable floor to move the alien at {cell} to")
+        to = min(options, key=lambda c: (abs(c[0] - cell[0]) + abs(c[1] - cell[1]), c))
+        b = bytearray(r)
+        b[1], b[2] = to
+        occupied.discard(cell)
+        occupied.add(to)
+        records[i] = bytes(b)
+        moved += 1
+    if moved:
+        print(f"deck {number}: moved {moved} egg(s)/alien(s) out of pits and shafts the player could not get back from")
     out = bytearray(m.d[:m.monsters_at]) + b"".join(records) + picks + b"".join(objs)
     out += m.d[m.doors_at:m.actions_at] + acts + cmds + m.d[m.tail_at:]
     struct.pack_into("<H", out, 14, len(records))

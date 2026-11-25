@@ -33,7 +33,16 @@ ARENAS = [   # number, source lair code, scale, name, enemy roster, starting wea
     (2, "263", 1.45, "Foundry Lair", "section2", [0]),
     (3, "391", 0.90, "Derelict Lair", "section3", [0]),   # the shotgun comes at wave 2 (the shared weapon schedule, ExplorerSurvival.h)
 ]
+SCENERY = {"263": ([25, 20], 8), "391": ([20], 5)}   # code: (object kinds, groups of 2-3)
 DAIS = 128   # the Queen's dais height (one step; the player climbs 256)
+# Floor and ceiling textures that make plain floor read as a lift: L391's pale lit floor tiles under a brown ceiling (a
+# lift car's look, in a 3-deep pocket off the west corridor) and its lift-pad tiles (3x4 patches in the hall). In the
+# arena they are ordinary floor, so they get the lair's common floor and ceiling. {code: (floors, floor, ceilings, ceiling)}
+# Corridor mouths that turn a corner straight away look like small closed rooms from the hall (a lintel over a box with
+# its back wall in view). Each becomes a bay of the hall instead: the solid inner corner is opened up and the bay takes
+# the hall's ceiling, so the corridor is seen running away from its side. {code: [(x0, z0, x1, z1) inclusive]}
+BAYS = {"391": [(2, 36, 10, 43), (5, 13, 12, 21)]}
+LIFT_LOOK = {"391": ({278, 281, 282, 284, 285, 291, 292, 299, 300}, 283, {269, 270}, 54)}
 
 # The Queen's egg sac and cord (the game draws it behind her in Survival, LevelExplorer loadSurvivalQueenSac) is a
 # block of L162's map, textured from L162's texture page 3. The other arenas get that page as an extra page 05 of their
@@ -50,19 +59,55 @@ def form(chunks_, kind):
     return b"FORM" + struct.pack(">I", len(body)) + body
 
 
-def gfx_with_sac_page(code):
-    """The lair's GFX.BIN plus L162's sac page as page 05, and the index of its first texture rectangle."""
+def gfx_with_sac_page(code, extra_pages=()):
+    """The lair's GFX.BIN plus L162's sac page as page 05 (then any extra L162 pages as 06, 07, ...), the index of the
+    sac page's first texture rectangle, and {L162 page: first rectangle of its copy} for the extra pages."""
     own = open(os.path.join(os.path.dirname(tl.find_level(code)), f"{code}GFX.BIN"), "rb").read()
     src = dict(tl.chunks(open(os.path.join(os.path.dirname(tl.find_level("162")), "162GFX.BIN"), "rb").read()))
+    count = lambda page: struct.unpack("<H", src[f"BX{page:02d}"][:2])[0]
     out = tl.chunks(own)
     first = sum(struct.unpack("<H", d[:2])[0] for t, d in out if t.startswith("BX"))
-    added = struct.unpack("<H", src[f"BX{SAC_PAGE:02d}"][:2])[0]
     out = [(t, bytearray(d)) for t, d in out]
+    pages = [SAC_PAGE, *extra_pages]
+    starts, at = {}, first
+    for i, page in enumerate(pages):
+        for kind in ("TP", "CL", "BX"):
+            out.append((f"{kind}{NEW_PAGE + i:02d}", src[f"{kind}{page:02d}"]))
+        starts[page] = at
+        at += count(page)
     info = next(d for t, d in out if t == "INFO")
-    struct.pack_into("<HH", info, 6, first + added, NEW_PAGE + 1)   # rectangle and page counts
-    for kind in ("TP", "CL", "BX"):
-        out.append((f"{kind}{NEW_PAGE:02d}", src[f"{kind}{SAC_PAGE:02d}"]))
-    return form([(t, bytes(d)) for t, d in out], own[8:12]), first
+    struct.pack_into("<HH", info, 6, at, NEW_PAGE + len(pages))   # rectangle and page counts
+    return form([(t, bytes(d)) for t, d in out], own[8:12]), first, {p: starts[p] for p in extra_pages}
+
+
+def borrowed_door_models(code):
+    """A lair with no door models of its own borrows L162's (TextureSet's fallback), but their faces number textures in
+    L162's texture bank. Returns (the L162 pages they use, a function giving the models renumbered onto those pages'
+    copies in the lair's bank), or ((), None) when the lair has its own."""
+    ts = tl.TextureSet(code)
+    if any(t[0] == "D" and t[1:].isdigit() for t, _ in ts.chunks):
+        return (), None
+    src = dict(tl.chunks(open(os.path.join(os.path.dirname(tl.find_level("162")), "162GFX.BIN"), "rb").read()))
+    bounds, at = {}, 0
+    for page in sorted(int(t[2:]) for t in src if t.startswith("BX")):
+        n = struct.unpack("<H", src[f"BX{page:02d}"][:2])[0]
+        bounds[page] = (at, at + n)
+        at += n
+    page_of = lambda tex: next(p for p, (a, b) in bounds.items() if a <= tex < b)
+    used = sorted({page_of(struct.unpack_from("<H", d, 20 + i * 20 + 16)[0])
+                   for _, d in ts.meshes for i in range(struct.unpack_from("<I", d, 12)[0])})
+
+    def renumbered(starts):
+        models = []
+        for tag, data in ts.meshes:
+            d = bytearray(data)
+            for i in range(struct.unpack_from("<I", d, 12)[0]):
+                tex = struct.unpack_from("<H", d, 20 + i * 20 + 16)[0]
+                page = page_of(tex)
+                struct.pack_into("<H", d, 20 + i * 20 + 16, starts[page] + tex - bounds[page][0])
+            models.append((tag, bytes(d)))
+        return models
+    return tuple(used), renumbered
 
 
 def sac_map(first_rect):
@@ -136,6 +181,75 @@ def resample(src, scale):
                     ceil[f"{x},{z}"] = max(tl.MIN_HEADROOM + 256, min(4064, clearance))
         grid.append(row)
     return W, H, grid, tex, ceil
+
+
+def fill_dead_ends(grid, ceil, region, hall=4000):
+    """The lair's dead-end pockets: lower-ceilinged stubs off the main hall that lead nowhere read as lift cars (a lintel
+    over a small box). A connected patch of lower ceiling is one when its cells meet the hall through a single opening
+    (the corridors that loop round meet it at two or more). Returns the grid with them solid and the cells filled."""
+    W, H = len(grid[0]), len(grid)
+    low = {c for c in region if ceil.get(f"{c[0]},{c[1]}", 0) < hall}
+    near = lambda x, z: ((x + 1, z), (x - 1, z), (x, z + 1), (x, z - 1))
+    filled, seen = set(), set()
+    for c in sorted(low):
+        if c in seen:
+            continue
+        comp, todo = {c}, [c]
+        while todo:
+            for n in near(*todo.pop()):
+                if n in low and n not in comp:
+                    comp.add(n)
+                    todo.append(n)
+        seen |= comp
+        mouth = {n for p in comp for n in near(*p) if n in region and n not in low}
+        groups, left = 0, set(mouth)
+        while left:
+            groups += 1
+            todo = [left.pop()]
+            while todo:
+                for n in [n for d in near(*todo.pop()) for n in [d] + list(near(*d))]:
+                    if n in left:
+                        left.discard(n)
+                        todo.append(n)
+        if groups == 1:
+            filled |= comp
+    rows = ["".join("#" if (x, z) in filled else grid[z][x] for x in range(W)) for z in range(H)]
+    return rows, filled
+
+
+def campaign_surfaces(code, rows, scale, src_size):
+    """Walls and lights as the lair has them (trilogy_level.surfaces), for the arena's open cells: each cell takes its
+    source cell's floor and ceiling lights, and each side the textures and lights, band by band, of the nearest source
+    cell with a wall on that side (its own first, then along the wall, then further out). Sides with none keep the
+    generator's own choice."""
+    flats, walls = tl.surfaces(code)
+    sw, sh = src_size
+    out_walls, out_lights = {}, {}
+    for z, row in enumerate(rows):
+        for x, t in enumerate(row):
+            if t != ".":
+                continue
+            sx, sz = min(sw - 1, int((x + 0.5) / scale)), min(sh - 1, int((z + 0.5) / scale))
+            if (sx, sz) in flats:
+                out_lights[f"{x},{z}"] = list(flats[(sx, sz)])
+            for side in range(4):
+                along = (0, 1) if side < 2 else (1, 0)
+                found = None
+                for r in range(3):
+                    ring = [(i, j) for i in range(-r, r + 1) for j in range(-r, r + 1) if max(abs(i), abs(j)) == r]
+                    # along the wall first (same distance into the room), then off it
+                    ring.sort(key=lambda o: (abs(o[0] * along[1] + o[1] * along[0]), abs(o[0]) + abs(o[1])))
+                    for i, j in ring:
+                        bands = walls.get((sx + i, sz + j, side))
+                        if bands:
+                            found = bands
+                            break
+                    if found:
+                        break
+                if found:
+                    out_walls[f"{x},{z},{side}"] = [list(found.get(b, found[min(found, key=lambda k: abs(k - b))]))
+                                                    for b in range(8)]
+    return out_walls, out_lights
 
 
 def reachable(grid, start):
@@ -232,7 +346,29 @@ def start_cell(grid, region, queen, footprint):
 def build(number, code, scale, name, roster, weapons):
     src = tl.import_level(tl.find_level(code))
     W, H, grid, tex, ceil = resample(src, scale)
+    if code in LIFT_LOOK:
+        floors, floor_tex, ceilings, ceil_tex = LIFT_LOOK[code]
+        changed = 0
+        for k, t in tex.items():
+            new = [floor_tex if t[0] in floors else t[0], t[1], ceil_tex if t[2] in ceilings else t[2]]
+            changed += new != t
+            tex[k] = new
+        print(f"arena {number}: {changed} cells that looked like lifts retextured as plain floor")
     region = largest_region(grid)
+    if code in LIFT_LOOK:
+        grid, filled = fill_dead_ends(grid, ceil, region)
+        region = largest_region(grid)
+        print(f"arena {number}: {len(filled)} cells of dead-end pockets filled in")
+    for x0, z0, x1, z1 in BAYS.get(code, []):
+        rows = [list(r) for r in grid]
+        for z in range(z0, z1 + 1):
+            for x in range(x0, x1 + 1):
+                rows[z][x] = "."
+                ceil[f"{x},{z}"] = 4064
+                tex[f"{x},{z}"] = [LIFT_LOOK[code][1], None, None]
+        grid = ["".join(r) for r in rows]
+        region = largest_region(grid)
+        print(f"arena {number}: corridor mouth at ({x0}-{x1}, {z0}-{z1}) opened into a bay of the hall")
     grid = ["".join("." if (x, z) in region else "#" for x in range(W)) for z in range(H)]
     # The Queen where the lair has her, on a dais; the start in front of her at the edge of the fog (start_cell).
     sq = next(e for e in src["enemies"] if e["kind"] == 7)
@@ -278,9 +414,27 @@ def build(number, code, scale, name, roster, weapons):
         "ammo_spots": [list(c) for c in ammo], "health_spots": [list(c) for c in health],
         "reserve_spots": [list(c) for c in reserve],
     }
+    # The lair's own walls and lighting (its tinted lights, and its wall textures in the order it lays them).
+    lv["walls"], lv["lights"] = campaign_surfaces(code, rows, scale, (src["width"], src["height"]))
+    print(f"arena {number}: {len(lv['walls'])} wall sides and {len(lv['lights'])} cells lit as in L{code}")
+    # Explosive barrels in three small groups, off the supply spots and the Queen's dais (Survival respawns destroyed
+    # ones every other wave).
+    dais = [(queen[0] + i, queen[1] + j) for i in range(-5, 6) for j in range(-5, 6)]
+    supplies = [tuple(c) for key in ("ammo_spots", "health_spots", "reserve_spots") for c in lv[key]]
+    lv["objects"] = tl.place_barrels(lv, avoid=dais + supplies)
+    # Scenery as the lair's section dresses its rooms: crates and lockers in Section 2's foundry, the alien pods
+    # (kind 20, drawn as pods in Section 3) aboard the derelict.
+    lv["objects"] += tl.place_scenery(lv, SCENERY[code][0], groups=SCENERY[code][1], avoid=dais + supplies)
     out = os.path.join(X360, "assets", f"survival{number}")
-    stats = tl.write(lv, out)
-    gfx, first_rect = gfx_with_sac_page(code)
+    # Doors: a lair without door models of its own (L391) borrows L162's - their texture pages come along too, and the
+    # models are renumbered onto them (else its doors showed whatever the lair's own bank held there, or nothing).
+    door_pages, renumber = borrowed_door_models(code)
+    gfx, first_rect, door_starts = gfx_with_sac_page(code, door_pages)
+    texset = None
+    if renumber:
+        texset = tl.TextureSet(code)
+        texset.meshes = renumber(door_starts)
+    stats = tl.write(lv, out, texset)
     open(os.path.join(out, f"{code}GFX.BIN"), "wb").write(gfx)
     open(os.path.join(out, "QUEENSAC.MAP"), "wb").write(sac_map(first_rect))
     preview(lv, os.path.join(out, "preview_map.png"))

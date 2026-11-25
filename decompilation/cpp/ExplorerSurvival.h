@@ -307,6 +307,7 @@ void explorerSurvivalWave(Scene& s, unsigned n)
     v.wave = n;
     v.queue.clear();
     if (n >= 3) { explorerSurvivalClearCorpses(s, n - 1, 1000); }   // bodies from two waves back
+    if (n >= 3 && n % 2 == 1) { s.objects.respawn(23); }   // every other wave: the destroyed explosive barrels return
     const Wave& wave = waveFor(v.cfg,n);
     std::vector<std::pair<unsigned char, unsigned char>> list;
     for (const auto& g : wave.groups)
@@ -534,9 +535,8 @@ bool explorerSurvivalSetup(Scene& s)
                 m.b(record+1,x);m.b(record+2,z);m.b(record+7,0);m.b(record+8,0);
                 const auto enemy=s.enemies->spawnSurvivalEnemy(index);
                 if(!enemy)return false;
-                const auto speed=m.w(enemy+0x5e);
-                m.w(enemy+0x5e,(speed*165+64)/128);
-                const int health=m.s(enemy+0x58)*2;
+                // The Queens keep their original speed; health 1.75x the original (was 2x: 12.5% lower).
+                const int health=m.s(enemy+0x58)*7/4;
                 m.w(enemy+0x58,health);
                 v.queenSupplies.emplace(enemy,ExplorerSurvivalState::QueenSupplies{health});
                 s.enemies->activateSurvivalQueen(enemy);

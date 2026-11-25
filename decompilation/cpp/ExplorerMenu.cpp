@@ -391,6 +391,8 @@ ExplorerMenu::Command ExplorerMenu::activate(unsigned key){
   survivalArena=unsigned((survivalArena+(direction<0?count-1:1))%count);
   return None;
  }
+ if(page=="options"&&selection==3&&adjust){sway=!sway;persist();return Apply;}
+ if(page=="cheats"&&!coopSession&&selection<2&&adjust){if(selection==0)godMode=!godMode;else infiniteAmmo=!infiniteAmmo;return CheatsChanged;}
  if(adjust)return None;
  if(page=="pause"){if(selection<5){constexpr unsigned weapons[]={0,1,4,2,3};return Command(Weapon0+weapons[selection]);}const auto label=list[selection];if(label==L"Batteries"){message=std::to_wstring(batteries)+L" batteries available";return UseBattery;}else if(label==L"Mission")enter("mission");else if(label==L"Save Game")enter("extermination save");else if(label==L"Load Game")enter(exterminationGame?"extermination load":"load");else if(label==L"Options")enter("options");else if(label==L"Exit to main menu")return MainMenu;else if(label==L"Exit Game")enter("confirm");}
  else if(page=="extermination load"||page=="extermination save"){if(selection==3)back();else{if(page=="extermination load"&&!exterminationSlotLevel(selection)){message=L"This slot is empty.";return None;}return Command((page=="extermination load"?ExterminationLoad1:ExterminationSave1)+selection);}}
@@ -455,6 +457,43 @@ ExplorerMenu::Command ExplorerMenu::activate(unsigned key){
  else if(page=="new-confirm"){if(selection){enter("new-difficulty");}else back();}
  else back();return None;
 }
+bool ExplorerMenu::adjustable(unsigned row)const{
+ if(page=="graphics")return row<12;
+ if(page=="volume")return row<3;
+ if(page=="controller")return row<6;
+ if(page=="controls")return row==bindings.size()||row==bindings.size()+1;
+ if(page=="options")return row==3;
+ if(page=="cheats")return !coopSession&&(row<2||row==3);
+ if(page=="survival")return row==0;
+ if(page=="coop")return row==4||row==6||row==7;
+ return false;
+}
+// The arrows of a row: one column either side of the page's widest adjustable row (with its selection marker), so they
+// line up down the page. The column is rounded out in steps and only ever widens while the page is up, so it stays put
+// under the mouse while a value's text changes length.
+ExplorerMenu::Arrows ExplorerMenu::arrows(int width,int rowTop,int line,int height)const{
+ const double fontScale=page=="main"?std::min(height/600.,line/16.):height/600.;
+ const auto list=rows();int widest=0;
+ for(unsigned i=0;i<list.size();++i)if(adjustable(i))widest=std::max(widest,originalFont.width(L"> "+list[i],fontScale));
+ const int step=std::max(1,line*2);widest=(widest+step-1)/step*step;
+ if(arrowColumn.page!=page||arrowColumn.width!=width||arrowColumn.height!=height)arrowColumn={page,width,height,0};
+ widest=arrowColumn.widest=std::max(arrowColumn.widest,widest);
+ const int size=std::max(3,int(line*.22)),gap=std::max(6,line/2);
+ return {(width-widest)/2-gap-size,(width+widest)/2+gap+size,rowTop+line/2,size};
+}
+// -1 or 1 when (x, y) is on the left or right arrow of an adjustable row, else 0.
+int ExplorerMenu::arrowAt(int x,int y,int width,int height,unsigned row)const{
+ if(!adjustable(row))return 0;
+ const auto list=rows();if(row>=list.size())return 0;
+ const auto [top,line]=menuRows(page,height,list.size());
+ const int rowTop=top+int(row)*line+(page=="survival"&&row>0?arenaPreviewHeight(height):0);
+ const auto a=arrows(width,rowTop,line,height);
+ const int reach=std::max(a.size*2,line/2);
+ if(std::abs(y-a.middle)>line/2)return 0;
+ if(std::abs(x-a.left)<=reach)return -1;
+ if(std::abs(x-a.right)<=reach)return 1;
+ return 0;
+}
 int ExplorerMenu::rowAt(int x,int y,int width,int height)const{
  auto list=rows();if(page=="password"){auto fit=explorerFit(width,height,4,3);double scale=fit.height/240.;int top=fit.y+int(155*scale),line=std::max(1,int(20*scale)),row=(y-top)/line;return y>=top&&x>=fit.x&&x<fit.x+fit.width&&row>=0&&row<int(list.size())?row:-1;}if(page=="assessment"){auto fit=explorerFit(width,height,4,3);double scale=fit.height/240.;int top=fit.y+int(145*scale),line=std::max(1,int(20*scale)),row=(y-top)/line;return y>=top&&x>=fit.x&&x<fit.x+fit.width&&row>=0&&row<int(list.size())?row:-1;}if(page=="pause"){double scale=height/480.;int row=(y-int(10*scale))/std::max(1,int(23*scale));return y>=int(10*scale)&&x>=int(10*scale)&&x<=int(174*scale)&&row>=0&&row<int(list.size())?row:-1;}
  const auto [top,line]=menuRows(page,height,list.size());
@@ -465,7 +504,9 @@ int ExplorerMenu::rowAt(int x,int y,int width,int height)const{
  int row=(y-top)/line;return y>=top&&row>=0&&row<int(list.size())&&x>width/8&&x<width*7/8?row:-1;
 }
 bool ExplorerMenu::hover(int x,int y,int width,int height){soundEvent=-1;if(listening>=0||controllerListening>=0||coopEditing>=0||page=="results"||page=="credits"||coopSession&&!coopHost&&(page=="coop-results"||page=="coop-scores"))return false;int row=rowAt(x,y,width,height);if(row<0||unsigned(row)==selection)return false;selection=unsigned(row);message.clear();soundEvent=0;return true;}
-ExplorerMenu::Command ExplorerMenu::click(int x,int y,int width,int height){soundEvent=-1;if(page=="results")return key(VK_RETURN);if(listening>=0)return key(VK_LBUTTON);int row=rowAt(x,y,width,height);if(row>=0){selection=unsigned(row);if(page=="graphics"&&row==4){int start=width/3,span=std::max(1,width/3);auto value=unsigned(std::clamp(50+int(std::lround(double(x-start)*60/span/5))*5,50,110));if(value==fov)return None;fov=value;soundEvent=0;persist();return Apply;}return key(VK_RETURN);}return None;}
+ExplorerMenu::Command ExplorerMenu::click(int x,int y,int width,int height,bool dragging){soundEvent=-1;if(page=="results")return key(VK_RETURN);if(listening>=0)return key(VK_LBUTTON);int row=rowAt(x,y,width,height);if(row>=0){selection=unsigned(row);
+  if(!dragging)if(int step=arrowAt(x,y,width,height,unsigned(row))){const auto before=rows();auto command=key(step<0?VK_LEFT:VK_RIGHT);if(soundEvent<0&&rows()!=before)soundEvent=0;return command;}
+ if(page=="graphics"&&row==4){int start=width/3,span=std::max(1,width/3);auto value=unsigned(std::clamp(50+int(std::lround(double(x-start)*60/span/5))*5,50,110));if(value==fov)return None;fov=value;soundEvent=0;persist();return Apply;}return key(VK_RETURN);}return None;}
 void ExplorerMenu::drawSurvivalArena(HDC dc,int width,int top,int height){
  auto& preview=arenaPreviews[survivalArena];
  if(preview.pixels.empty()&&!preview.width){
@@ -576,7 +617,13 @@ auto& image=images[page=="main"?0:1];BITMAPINFO info{};info.bmiHeader.biSize=siz
      const int left=(width-originalFont.width(text,fontScale)-16*iconPixel-gap)/2;
      drawXenoSkull(dc,left,r.top+(line-12*iconPixel)/2,iconPixel,(survivalSkulls&(1u<<visibleSkulls[i]))!=0);
      originalFont.draw(dc,text,left+16*iconPixel+gap,r.top+(line-int(16*fontScale))/2,fontScale,tint);
- }else originalFont.draw(dc,text,(width-originalFont.width(text,fontScale))/2,r.top+(line-int(16*fontScale))/2,fontScale,tint);}
+ }else{originalFont.draw(dc,text,(width-originalFont.width(text,fontScale))/2,r.top+(line-int(16*fontScale))/2,fontScale,tint);
+  if(adjustable(i)){   // a triangle either side of the value: Left/Right (or a click on one) steps it
+   const auto a=arrows(width,r.top,line,height);auto brush=CreateSolidBrush(RGB((tint>>16)&255,(tint>>8)&255,tint&255));auto oldBrush=SelectObject(dc,brush);auto oldPen=SelectObject(dc,GetStockObject(NULL_PEN));
+   POINT left[]{{a.left-a.size,a.middle},{a.left+a.size,a.middle-a.size},{a.left+a.size,a.middle+a.size}},right[]{{a.right+a.size,a.middle},{a.right-a.size,a.middle-a.size},{a.right-a.size,a.middle+a.size}};
+   Polygon(dc,left,3);Polygon(dc,right,3);SelectObject(dc,oldPen);SelectObject(dc,oldBrush);DeleteObject(brush);
+  }
+ }}
  if(page=="fun-skulls"){
   originalFont.box(dc,L"Enabling any Fun Skull makes the run unscored.",
       RECT{width/10,top+int(list.size())*line+4,width*9/10,height-52},height/700.,0xffffff,true);

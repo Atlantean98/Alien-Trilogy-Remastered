@@ -30,6 +30,10 @@ SOLID, ARENA, DOOR, ROOM, WOMB = 0, 1, 2, 3, 4
 WALL_BANDS = [[3, 4], [326, 327, 323], [296, 297, 290], [290, 291, 292, 293], [284, 285, 286, 287], [280, 281, 282, 283]]
 WOMB_BANDS = [[232, 233], [234, 235], [236, 237], [264, 265], [266, 267], [268, 269]]
 ROOM_WALL, ROOM_FLOOR, ROOM_CEILING = [355, 356], 351, 352
+# L162's cavern walls as it lays them: each 512-unit band runs its own 2- or 4-panel pictures in order along the wall
+# (trilogy_level.surfaces on L162: 3-4 or 338-343 at the foot, then 330-335, 322-327, 292-297, 286-291 up to the roof).
+WALL_SEQS = [[[3, 4], [338, 339, 342, 343]], [[330, 331, 334, 335]], [[322, 323, 326, 327]], [[292, 293, 296, 297]],
+             [[286, 287, 290, 291]]]
 
 
 def noise(x, z, seed=0):
@@ -169,14 +173,22 @@ def level():
         cells = sorted(d["cells"])
         axis = "z" if d["side"] in ("west", "east") else "x"
         door_list.append({"x": cells[0][0], "z": cells[0][1], "axis": axis})
-    return {
+    lv = {
         "name": "Survival", "code": "162", "width": W, "height": H, "grid": rows, "doors": door_list,
         "start": list(start), "start_dir": 4, "enemies": [{"kind": 7, "x": queen[0], "z": queen[1]}], "pickups": [],
         "mode": "survival", "lives": 5, "weapons": [0], "waves": 10, "roster": "campaign", "queen_last_wave": True,
         "brightness": "normal", "ammo_spots": spots(AMMO_SPOTS, reach), "health_spots": spots(HEALTH_SPOTS, reach),
         "reserve_spots": RESERVE_SPOTS, "wall_bands": WALL_BANDS, "hive_bands": WOMB_BANDS, "room_wall": ROOM_WALL,
-        "room_floor": ROOM_FLOOR, "room_ceiling": ROOM_CEILING,
+        "room_floor": ROOM_FLOOR, "room_ceiling": ROOM_CEILING, "wall_seqs": WALL_SEQS,
     }
+    # Explosive barrels in three small groups - off the supply spots and clear of the egg sac behind the Queen
+    # (its footprint runs about x 33-41, z 30-47). Survival respawns destroyed ones every other wave.
+    sac = [(x, z) for x in range(32, 43) for z in range(29, 49)]
+    supplies = [tuple(c) for key in ("ammo_spots", "health_spots", "reserve_spots") for c in lv[key]]
+    lv["objects"] = trilogy_level.place_barrels(lv, avoid=sac + supplies)
+    # Scenery as Section 1 dresses its rooms: stacks of crates and lockers against the cavern wall.
+    lv["objects"] += trilogy_level.place_scenery(lv, [25, 20], groups=5, avoid=sac + supplies)
+    return lv
 
 
 def preview(lv, path):

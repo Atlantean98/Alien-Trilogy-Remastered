@@ -49,7 +49,9 @@ public:
  void showResults(const std::array<unsigned,3>&,bool passed=true,unsigned required=0);bool resultsReady()const;
  void show(bool running);void pauseGame();void close(){open=false;}
  int soundEvent=-1;bool hover(int x,int y,int width,int height);
- Command key(unsigned key);Command click(int x,int y,int width,int height);
+ Command key(unsigned key);Command click(int x,int y,int width,int height,bool dragging=false);
+ // Rows whose value Left/Right steps through (drawn with an arrow either side; clicking an arrow steps it).
+ bool adjustable(unsigned row)const;int arrowAt(int x,int y,int width,int height,unsigned row)const;
  void draw(HDC,int width,int height);
  void drawOriginalText(HDC dc,const std::wstring& text,int x,int y,double scale,unsigned color=0xffffff)const{originalFont.paragraph(dc,text,x,y,scale,color);}
  void persist()const;void defaults();
@@ -77,5 +79,6 @@ private:
  std::array<ArenaPreview,std::size(SurvivalArenaNames)> arenaPreviews;
  int listening=-1;std::vector<std::pair<std::string,unsigned>> history;
  Command activate(unsigned key);int rowAt(int x,int y,int width,int height)const;
+ struct Arrows {int left,right,middle,size;};Arrows arrows(int width,int rowTop,int line,int height)const;struct ArrowColumn {std::string page;int width=0,height=0,widest=0;};mutable ArrowColumn arrowColumn;
  void enter(const std::string&);void back();std::wstring keyName(unsigned)const;
 };

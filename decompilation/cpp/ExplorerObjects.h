@@ -7,6 +7,7 @@ public:
  void load(trilogy::original::PlayerControlMemory,bool walkThroughWalls=false);
  void tick();
  bool visible(unsigned i)const;
+ unsigned respawn(unsigned kind);   // Survival: destroyed objects of this kind back where the map put them
  std::vector<unsigned char> networkRemoved()const;void networkRemoved(const std::vector<unsigned char>&);
  struct Effect {int x,y,z;unsigned age;bool barrel;};
  std::vector<Effect> effects;
@@ -19,4 +20,5 @@ private:
  trilogy::original::PlayerControlMemory m{};
  std::vector<bool> removed;
  void clear(unsigned);
+ void place(unsigned i,bool walkThroughWalls);
 };

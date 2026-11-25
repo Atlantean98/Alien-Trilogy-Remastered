@@ -389,6 +389,10 @@ def geometry(level, ts):
     is_open = lambda x, z: 0 <= x < W and 0 <= z < H and grid[z][x] in ".RD"
     ceil_set = {tuple(map(int, k.split(","))): int(v) for k, v in level.get("ceil", {}).items()}
     tex_set = {tuple(map(int, k.split(","))): v for k, v in level.get("tex", {}).items()}
+    # Per-cell surfaces copied from a campaign level: walls {"x,z,side": [[texture, light] or None per band]} and
+    # lights {"x,z": [floor light, ceiling light]} (None keeps the default).
+    wall_set = {tuple(map(int, k.split(","))): v for k, v in level.get("walls", {}).items()}
+    light_set = {tuple(map(int, k.split(","))): v for k, v in level.get("lights", {}).items()}
     floor_set = {tuple(map(int, k.split(","))): max(0, min(MAX_FLOOR, int(v) // 32 * 32)) for k, v in level.get("floor", {}).items()}
     ramp_set = {tuple(map(int, k.split(","))): int(v) % 4 for k, v in level.get("ramp", {}).items()}
     for d in doors:   # a door's cells share one floor (its record has one)
@@ -448,6 +452,8 @@ def geometry(level, ts):
                 continue
             cell_face[(x, z)] = len(faces)
             own = tex_set.get((x, z), [None, None, None])
+            own_light = light_set.get((x, z), [None, None]) if t == "." else [None, None]
+            pick_light = lambda part, default: default if own_light[part] is None else own_light[part]
             c00, c01, c11, c10 = (x, z), (x, z + 1), (x + 1, z + 1), (x + 1, z)
             if own[0] is not None:
                 ftex, fflags = own[0], 0
@@ -456,7 +462,7 @@ def geometry(level, ts):
             else:
                 ftex, fflags = level.get("room_floor", ts.floor_textures[0]), 0
             faces.append(((v(x, floor_at(x, z, *c00), z), v(x, floor_at(x, z, *c01), z + 1), v(x + 1, floor_at(x, z, *c11), z + 1),
-                           v(x + 1, floor_at(x, z, *c10), z)), ftex, fflags, L_FLOOR))
+                           v(x + 1, floor_at(x, z, *c10), z)), ftex, fflags, pick_light(0, L_FLOOR)))
             meta.append((x, z, 0))
             if own[2] is not None:
                 ctex, cflags = own[2], 0
@@ -465,7 +471,7 @@ def geometry(level, ts):
             else:
                 ctex, cflags = level.get("room_ceiling", ts.ceil_textures[0]), 0
             faces.append(((v(x, ceil(x, z, *c01), z + 1), v(x, ceil(x, z, *c00), z), v(x + 1, ceil(x, z, *c10), z),
-                           v(x + 1, ceil(x, z, *c11), z + 1)), ctex, cflags, 128 | L_HIGH))
+                           v(x + 1, ceil(x, z, *c11), z + 1)), ctex, cflags, pick_light(1, 128 | L_HIGH)))
             meta.append((x, z, 1))
             for side, (nx, nz, a, b) in enumerate(((x - 1, z, c00, c01), (x + 1, z, c11, c10), (x, z - 1, c10, c00), (x, z + 1, c01, c11))):
                 top_a, top_b = ceil(x, z, *a), ceil(x, z, *b)
@@ -501,8 +507,22 @@ def geometry(level, ts):
                         ya1, yb1 = max(bottom_a, min(y1, top_a_)), max(bottom_b, min(y1, top_b_))
                         if ya1 > ya0 or yb1 > yb0:
                             tex = pick(bands[min(band, len(bands) - 1)], x, z, nx, nz, band)
+                            light = L_WALL if band < 3 else 128 | L_HIGH
+                            # Sequenced walls (a campaign level's 2- and 4-panel pictures): per band, the sequences
+                            # the level runs along its walls, laid in order by position - reversed on the -x and +z
+                            # faces, as the campaign's are, so the picture reads the same way from either side. Which
+                            # of a band's sequences a stretch of wall gets changes slowly over the map.
+                            seqs = level.get("wall_seqs")
+                            if seqs and t == "." and not hive and side_tex is None and own[1] is None:
+                                options = seqs[min(band, len(seqs) - 1)]
+                                seq = options[int((noise(x / 7, z / 7, band) + 1) / 2 * len(options)) % len(options)]
+                                pos = x if side >= 2 else z
+                                tex = seq[pos % len(seq) if side in (1, 2) else -pos % len(seq)]
+                            own_wall = wall_set.get((x, z, side))
+                            if own_wall and t == "." and own_wall[min(band, len(own_wall) - 1)]:
+                                tex, light = own_wall[min(band, len(own_wall) - 1)]
                             faces.append(((v(a[0], ya0, a[1]), v(b[0], yb0, b[1]), v(b[0], yb1, b[1]), v(a[0], ya1, a[1])),
-                                          tex, 0, L_WALL if band < 3 else 128 | L_HIGH))
+                                          tex, 0, light))
                             meta.append((x, z, 2 + side))
                         if y1 >= max(top_a_, top_b_):
                             break
@@ -556,9 +576,18 @@ def _tables(level, ts, g):
         lock = 1 if id(d) in spawn else 0   # spawn doors: the game opens them; others: automatic
         door_records.append(bytes([rx_, rz_, 0, 150, lock, floor_set.get(cells[1], FLOOR) // 32, rotation, 1 if any(t == "D001" for t, _ in ts.meshes) else 0]))
 
+    # Map objects as the campaign's own records: explosive barrels (kind 23: health 1 x 16), crates (25) and lockers
+    # (20; the alien pods in Section 3) at health 5 x 16 - all 1x1 cell, empty, no links.
+    object_records = []
+    for o in level.get("objects", []):
+        kind = o.get("kind", 23)
+        health, spare = (1, 0) if kind == 23 else (5, 10)
+        object_records.append(bytes([o["x"], o["z"], kind, 0, health, spare, 255, 255, 1, 1, 0, 0, 0, 0,
+                                     o.get("facing", 0), 0]))
+
     start = level["start"]
     out = bytearray(struct.pack("<HHHHHHBBHHHHHHHBBHI", len(verts), len(faces) + 1, W, H, start[0], start[1], 1,
-                                ts.light_count, len(records), len(pickups), 0, len(door_records), 0,
+                                ts.light_count, len(records), len(pickups), len(object_records), len(door_records), 0,
                                 level.get("start_dir", 4), 0, 0, 0, 0, 67))
     for x, y, z in verts:
         out += struct.pack("<hhhH", x, y, z, 0)
@@ -587,6 +616,8 @@ def _tables(level, ts, g):
         out += r
     for p in pickups:
         out += p
+    for o in object_records:   # the objects section sits between the pickups and the doors
+        out += o
     for r in door_records:
         out += r
     lights = bytearray(ts.lights)
@@ -659,6 +690,70 @@ def write(level, folder, texset=None):
     shutil.copyfile(ts.gfx_path, os.path.join(folder, f"{level['code']}GFX.BIN"))
     open(os.path.join(folder, "level.txt"), "w", newline="\n").write(cfg)
     return stats
+
+
+def surfaces(code):
+    """A campaign level's own surfaces, for levels built from it: {(x, z): (floor light, ceiling light)} for its open
+    cells, and {(x, z, side): {band: (texture, light)}} for its walls - side 0-3 as geometry() numbers them (the wall on
+    the cell's -x, +x, -z, +z edge), band the wall's 512-unit step above that cell's floor. A wall face belongs to the
+    open cell its front faces (its normal points into that cell)."""
+    m = dict(chunks(open(find_level(code), "rb").read()))["MAP0"]
+    w = lambda o: struct.unpack("<H", m[o:o + 2])[0]
+    vc, fc, W, H = w(0), w(2), w(4), w(6)
+    fb, cb = 36 + vc * 8, 36 + vc * 8 + fc * 20
+    vert = lambda i: struct.unpack("<hhh", m[36 + i * 8:42 + i * 8])
+    cells = {}
+    for z in range(H):
+        for x in range(W):
+            c = m[cb + (z * W + x) * 16:cb + (z * W + x) * 16 + 16]
+            ptr = struct.unpack("<i", c[0:4])[0]
+            if ptr < 0:
+                continue
+            cells[(x, z)] = (ptr, c[11] * 32, c[13] * 32)
+    flats = {}
+    for (x, z), (ptr, base, top) in cells.items():
+        lights = [None, None]
+        for fi in (ptr, ptr + 1):
+            if fi >= fc - 1:
+                continue
+            o = fb + fi * 20
+            ys = {vert(j)[1] for j in struct.unpack("<iiii", m[o:o + 16]) if j >= 0}
+            if len(ys) == 1:
+                lights[1 if ys.pop() > base + 64 else 0] = m[o + 19]
+        flats[(x, z)] = tuple(lights)
+    walls = collections.defaultdict(dict)
+    for i in range(fc - 1):
+        o = fb + i * 20
+        vs = [vert(j) for j in struct.unpack("<iiii", m[o:o + 16]) if j >= 0]
+        if len({v[1] for v in vs}) == 1 or m[o + 18] in SKIP_FLAGS or len(vs) < 3:
+            continue
+        a, b, c = vs[0], vs[1], vs[2]
+        u, v = [b[k] - a[k] for k in range(3)], [c[k] - a[k] for k in range(3)]
+        nx, nz = u[1] * v[2] - u[2] * v[1], u[0] * v[1] - u[1] * v[0]
+        xs, zs, ys = [q[0] for q in vs], [q[2] for q in vs], [q[1] for q in vs]
+        if min(xs) == max(xs) and max(zs) > min(zs):
+            line = (xs[0] + W * 256) / 512
+            across = int(((min(zs) + max(zs)) / 2 + H * 256) // 512)
+            if line != int(line):
+                continue
+            owner, side = ((int(line) - 1, across), 1) if nx < 0 else ((int(line), across), 0)
+        elif min(zs) == max(zs) and max(xs) > min(xs):
+            line = (zs[0] + H * 256) / 512
+            across = int(((min(xs) + max(xs)) / 2 + W * 256) // 512)
+            if line != int(line):
+                continue
+            owner, side = ((across, int(line) - 1), 3) if nz < 0 else ((across, int(line)), 2)
+        else:   # a diagonal wall: the cell its middle faces into, the side its front is turned to
+            length = math.hypot(nx, nz) or 1
+            mx = (min(xs) + max(xs)) / 2 + nx / length * 200
+            mz = (min(zs) + max(zs)) / 2 + nz / length * 200
+            owner = (int((mx + W * 256) // 512), int((mz + H * 256) // 512))
+            side = (1 if nx < 0 else 0) if abs(nx) >= abs(nz) else (3 if nz < 0 else 2)
+        if owner not in cells:
+            continue
+        band = max(0, min(7, (min(ys) - cells[owner][1]) // 512))
+        walls[(*owner, side)].setdefault(band, (w(o + 16), m[o + 19]))
+    return flats, dict(walls)
 
 
 def import_level(path):
@@ -737,3 +832,113 @@ def import_level(path):
             "start_dir": w(24) if w(24) < 8 else 4, "enemies": enemies, "pickups": pickups, "mode": "exterminate",
             "lives": 5, "weapons": [0, 1, 2], "waves": 10, "roster": "campaign", "queen_last_wave": True,
             "brightness": "normal"}
+
+
+def place_scenery(level, kinds, groups=5, avoid=(), seed=25, from_start=4, from_queen=7):
+    """Scenery for a Survival arena as the campaign dresses its rooms: `groups` stacks of 2-3 crates or lockers (kinds,
+    used in turn) standing against a wall, in roomy places (the 5x5 round them mostly floor), off the start, the Queen,
+    the spawn doors' approach, enemy spots, the level's objects and any `avoid` cells, groups at least 8 cells apart.
+    A group is kept only if everything the player needs (supply spots, doorways, the Queen) is still reachable from the
+    start round it. Deterministic. Returns [{"kind", "x", "z", "facing"}]."""
+    import random
+    grid, W, H = level["grid"], level["width"], level["height"]
+    floor = lambda x, z: 0 <= x < W and 0 <= z < H and grid[z][x] == "."
+    start = tuple(level["start"])
+    queens = [(e["x"], e["z"]) for e in level.get("enemies", []) if e["kind"] == 7]
+    taken = {(e["x"], e["z"]) for e in level.get("enemies", [])} | {(o["x"], o["z"]) for o in level.get("objects", [])}
+    near_doors = {(x + i, z + j) for d in level.get("doors", []) for x, z in door_cells(d)
+                  for i in range(-4, 5) for j in range(-4, 5)}
+    blocked = taken | near_doors | set(map(tuple, avoid))
+    blocked |= {(x + i, z + j) for x, z in taken for i in (-1, 0, 1) for j in (-1, 0, 1)}
+    needed = [tuple(c) for key in ("ammo_spots", "health_spots", "reserve_spots") for c in level.get(key, [])]
+    needed += queens + [(x + i, z + j) for d in level.get("doors", []) for x, z in door_cells(d)
+                        for i in (-1, 0, 1) for j in (-1, 0, 1) if floor(x + i, z + j)]
+    near = lambda x, z: ((x - 1, z), (x + 1, z), (x, z - 1), (x, z + 1))
+
+    def roomy(x, z):
+        return sum(floor(x + i, z + j) for i in range(-2, 3) for j in range(-2, 3)) >= 17
+
+    def reaches(solid):
+        seen, todo = {start}, [start]
+        while todo:
+            for n in near(*todo.pop()):
+                if floor(*n) and n not in solid and n not in seen:
+                    seen.add(n)
+                    todo.append(n)
+        return all(c in seen for c in needed if floor(*c))
+
+    rng = random.Random(seed)
+    candidates = []
+    for z in range(H):
+        for x in range(W):
+            if not floor(x, z) or (x, z) in blocked or not roomy(x, z):
+                continue
+            if max(abs(x - start[0]), abs(z - start[1])) < from_start:
+                continue
+            if any(max(abs(x - q[0]), abs(z - q[1])) < from_queen for q in queens):
+                continue
+            walls = [i for i, n in enumerate(near(x, z)) if not floor(*n)]
+            if len(walls) == 1:   # against one wall: the stack runs along it
+                candidates.append((x, z, walls[0]))
+    rng.shuffle(candidates)
+    placed, solid, centres = [], set(), []
+    for x, z, wall in candidates:
+        if len(centres) == groups:
+            break
+        if any(max(abs(x - c[0]), abs(z - c[1])) < 8 for c in centres):
+            continue
+        along = (0, 1) if wall < 2 else (1, 0)
+        size = 3 if len(centres) % 2 == 0 else 2
+        cells = [(x + along[0] * i, z + along[1] * i) for i in range(size)]
+        if not all(floor(*c) and c not in blocked and c not in solid for c in cells):
+            continue
+        if not all(not floor(*near(*c)[wall]) for c in cells):   # the whole stack against the wall
+            continue
+        if not reaches(solid | set(cells)):
+            continue
+        centres.append((x, z))
+        solid |= set(cells)
+        kind = kinds[len(centres) % len(kinds)]
+        for c in cells:
+            placed.append({"kind": kind, "x": c[0], "z": c[1], "facing": rng.randrange(8)})
+    return placed
+
+
+def place_barrels(level, avoid=(), clusters=3, seed=23, from_start=7, from_queen=9):
+    """Explosive barrels for a Survival arena: `clusters` groups of 2-3 (7 in all) on open floor with floor all round,
+    away from the start, the Queen, the spawn doors' approach, supplies, enemy spots and any `avoid` cells, the groups
+    at least 10 cells apart. Deterministic for a given level and seed. Returns [{"kind": 23, "x", "z", "facing"}]."""
+    import random
+    grid, W, H = level["grid"], level["width"], level["height"]
+    floor = lambda x, z: 0 <= x < W and 0 <= z < H and grid[z][x] == "."
+    start = tuple(level["start"])
+    queens = [(e["x"], e["z"]) for e in level.get("enemies", []) if e["kind"] == 7]
+    taken = {(p["x"], p["z"]) for p in level.get("pickups", [])} | {(e["x"], e["z"]) for e in level.get("enemies", [])}
+    near_doors = {(x + i, z + j) for d in level.get("doors", []) for x, z in door_cells(d)
+                  for i in range(-4, 5) for j in range(-4, 5)}
+    blocked = taken | near_doors | set(map(tuple, avoid))
+
+    def roomy(x, z):
+        return all(floor(x + i, z + j) for i in (-1, 0, 1) for j in (-1, 0, 1))
+
+    candidates = [(x, z) for z in range(H) for x in range(W)
+                  if roomy(x, z) and (x, z) not in blocked
+                  and max(abs(x - start[0]), abs(z - start[1])) >= from_start
+                  and all(max(abs(x - q[0]), abs(z - q[1])) >= from_queen for q in queens)]
+    rng = random.Random(seed)
+    rng.shuffle(candidates)
+    shapes = [((0, 0), (1, 0), (0, 1)), ((0, 0), (1, 0)), ((0, 0), (0, 1))]   # 3 + 2 + 2
+    barrels, centres = [], []
+    for c in candidates:
+        if len(centres) == clusters:
+            break
+        if any(max(abs(c[0] - o[0]), abs(c[1] - o[1])) < 10 for o in centres):
+            continue
+        shape = shapes[len(centres) % len(shapes)]
+        cells = [(c[0] + dx, c[1] + dz) for dx, dz in shape]
+        if not all(roomy(*p) and p not in blocked for p in cells):
+            continue
+        centres.append(c)
+        for p in cells:
+            barrels.append({"kind": 23, "x": p[0], "z": p[1], "facing": rng.randrange(8)})
+    return barrels

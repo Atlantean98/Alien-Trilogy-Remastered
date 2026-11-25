@@ -9,18 +9,35 @@ void ExplorerObjects::load(PlayerControlMemory memory,bool walkThroughWalls){
  for(unsigned i=0;i<m.w(0xa0c1e);++i){auto r=m.d(0xa0c58)+i*16,p=Pool+i*40;unsigned kind=m.b(r+2);
   if(kind==22||kind==24||kind==26||kind==27||kind==32)continue;
   if(kind<20||kind>37)continue;
-  entries.push_back(i);m.b(p+24,kind);m.b(p+25,m.b(r+3)|(kind>=33?1:0));m.w(p+26,m.b(r+4)*16);m.b(p+28,m.b(r+6));m.b(p+29,m.b(r+7));m.b(p+30,i);m.b(p+31,0);m.b(p+32,m.b(r+8));m.b(p+33,m.b(r+9));m.w(p+34,m.w(r+14));m.w(p+36,m.w(r+10));m.w(p+38,m.w(r+12));
+  entries.push_back(i);place(i,walkThroughWalls);
+  if(kind<33)m.w(0xa0bc8+kind*2,m.w(0xa0bc8+kind*2)+1);
+ }
+}
+// One object's pool slot, position and cell occupancy, from its map record (load, and respawn).
+void ExplorerObjects::place(unsigned i,bool walkThroughWalls){
+  auto r=m.d(0xa0c58)+i*16,p=Pool+i*40;unsigned kind=m.b(r+2);
+  m.b(p+24,kind);m.b(p+25,m.b(r+3)|(kind>=33?1:0));m.w(p+26,m.b(r+4)*16);m.b(p+28,m.b(r+6));m.b(p+29,m.b(r+7));m.b(p+30,i);m.b(p+31,0);m.b(p+32,m.b(r+8));m.b(p+33,m.b(r+9));m.w(p+34,m.w(r+14));m.w(p+36,m.w(r+10));m.w(p+38,m.w(r+12));
   unsigned x=m.b(r),z=m.b(r+1),cell=m.d(0xa0c40)+(z*m.w(0xa0c30)+x)*16;
   m.w(p,int(x*512+256)-m.w(0xa0c34));m.w(p+4,int(z*512+256)-m.w(0xa0c36));m.w(p+2,m.b(cell+11)*32);m.d(p+20,cell);
-  if(kind<33)m.w(0xa0bc8+kind*2,m.w(0xa0bc8+kind*2)+1);
   // L161's confirmed walk-through organic walls retain their visible geometry.
   // Do not turn their object rectangles into solid occupants. Other levels keep
   // the recovered blast-only wall behaviour, including L112's seismic secret.
-  if(walkThroughWalls&&kind==21)continue;
+  if(walkThroughWalls&&kind==21)return;
   // Large objects occupy their complete serialized rectangle (0x36a38).
   bool rectangle=kind==21||kind==28||kind==29;
   for(unsigned dz=0;dz<(rectangle?m.b(p+33):1);++dz)for(unsigned dx=0;dx<(rectangle?m.b(p+32):1);++dx)if(x+dx<m.w(0xa0c30)&&z+dz<m.w(0xa0c32)){auto c=cell+(dz*m.w(0xa0c30)+dx)*16;m.b(c+12,kind);m.b(c+4,i);}
+}
+// Survival: destroyed objects of one kind (explosive barrels) come back where the map put them. A cell something now
+// stands on (an alien, the player's pickup) is left until the next time.
+unsigned ExplorerObjects::respawn(unsigned kind){
+ unsigned count=0;
+ for(auto i:entries){
+  if(!removed[i]||m.b(m.d(0xa0c58)+i*16+2)!=kind)continue;
+  auto r=m.d(0xa0c58)+i*16;auto cell=m.d(0xa0c40)+(m.b(r+1)*m.w(0xa0c30)+m.b(r))*16;
+  if(m.b(cell+12))continue;
+  place(i,false);removed[i]=false;++count;
  }
+ return count;
 }
 bool ExplorerObjects::visible(unsigned i)const{return i<removed.size()&&!removed[i];}
 void ExplorerObjects::clear(unsigned p){
